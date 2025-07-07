@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>{{ lms_title }}</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      transition: background 0.3s, color 0.3s;
+    }
+
+    body.light {
+      background: #f7f7f7;
+      color: #000;
+    }
+
+    body.dark {
+      background: #121212;
+      color: #eee;
+    }
+
+    .header {
+      padding: 20px;
+      font-size: 28px;
+      font-weight: bold;
+      text-align: center;
+    }
+
+    .course-grid {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 20px;
+      padding: 20px;
+    }
+
+    .course-card {
+      width: 280px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      background: white;
+      overflow: hidden;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      cursor: pointer;
+      text-align: center;
+      transition: transform 0.2s;
+    }
+
+    .course-card:hover {
+      transform: scale(1.03);
+    }
+
+    .course-card .icon-area {
+      height: 160px;
+      background: #222;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #aaa;
+      font-size: 48px;
+    }
+
+    .course-card .title {
+      padding: 10px;
+      font-weight: bold;
+      font-size: 16px;
+    }
+
+    .dark .course-card {
+      background: #1f1f1f;
+      color: #eee;
+      border-color: #333;
+    }
+
+    .dark .course-card .title {
+      color: #fff;
+    }
+
+    .theme-toggle {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      font-size: 24px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body class="light">
+  <div class="theme-toggle" onclick="toggleTheme()">🌓</div>
+  <div class="header">{{ lms_title }}</div>
+
+  <div class="course-grid">
+    {% for course in courses %}
+      <div class="course-card" onclick="location.href='/course/{{ course }}'">
+        <div class="icon-area">📁</div>
+        <div class="title">{{ course }}</div>
+      </div>
+    {% endfor %}
+  </div>
+
+  <script>
+    function toggleTheme() {
+      document.body.classList.toggle('dark');
+      document.body.classList.toggle('light');
+      localStorage.setItem("theme", document.body.classList.contains("dark") ? "dark" : "light");
+    }
+
+    window.addEventListener("DOMContentLoaded", () => {
+      const theme = localStorage.getItem("theme") || "dark";
+      document.body.classList.add(theme);
+    });
+  </script>
+</body>
+</html>

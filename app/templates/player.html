@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>{{ lms_title }}</title>
+  <link href="https://vjs.zencdn.net/8.3.0/video-js.css" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-light: #fff;
+      --bg-dark: #121212;
+      --text-light: #000;
+      --text-dark: #eee;
+    }
+
+    html, body {
+      height: 100%;
+      margin: 0;
+      font-family: Arial, sans-serif;
+    }
+
+    body.light {
+      background: var(--bg-light);
+      color: var(--text-light);
+    }
+
+    body.dark {
+      background: var(--bg-dark);
+      color: var(--text-dark);
+    }
+
+    .container {
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .video-area {
+      flex: 2;
+      display: flex;
+      flex-direction: column;
+      padding: 10px;
+      box-sizing: border-box;
+    }
+
+    .video-wrapper {
+      position: relative;
+      width: 100%;
+      padding-top: 56.25%;
+      background: black;
+    }
+
+    .video-js {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100% !important;
+      height: 100% !important;
+    }
+
+    #video-title {
+      margin-top: 10px;
+      font-size: 16px;
+      font-weight: bold;
+      text-align: center;
+      color: inherit;
+    }
+
+    body.dark #video-title {
+      color: #fff;
+    }
+
+    body.light #video-title {
+      color: #000;
+    }
+
+    .sidebar {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: #1f1f1f;
+      padding: 15px;
+      min-width: 280px;
+      max-width: 600px;
+      box-sizing: border-box;
+      overflow-y: auto;
+      color: #fff
+    }
+
+    .sidebar.dark {
+      background: #1e1e1e;
+      color: #fff;
+    }
+
+    .sidebar.light {
+      background: #f7f7f7;
+      color: #000;
+    }
+
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+
+    ul {
+      list-style: none;
+      padding-left: 15px;
+      margin: 0;
+    }
+
+    .folder {
+      font-weight: bold;
+      cursor: pointer;
+      margin: 5px 0;
+      padding: 8px 4px;
+      display: inline-block;
+      font-size: 16px;
+      line-height: 1.5;
+      color: inherit;
+    }
+
+    .children {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.25s ease;
+      margin-left: 15px;
+    }
+
+    .children.open {
+      max-height: 10000px;
+    }
+
+    .video-link {
+      color: red;
+      text-decoration: none;
+      padding: 8px 4px;
+      display: inline-block;
+      font-size: 16px;
+      line-height: 1.5;
+    }
+
+    .video-link.watched {
+      color: green;
+    }
+
+    .toggle-btn {
+      cursor: pointer;
+      font-size: 20px;
+    }
+
+    .vjs-speed-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+      font-size: 1.5em;
+    }
+
+    .vjs-speed-button {
+      cursor: pointer;
+      padding: 4px 10px;
+    }
+
+    .speed-slider {
+      display: none;
+      position: absolute;
+      bottom: 35px;
+      right: 0;
+      background: #333;
+      padding: 8px;
+      border-radius: 6px;
+      color: white;
+      z-index: 999;
+      width: 140px;
+    }
+
+    .speed-slider input[type=range] {
+      width: 100%;
+    }
+
+    .speed-slider span {
+      font-size: 13px;
+    }
+
+    @media (max-width: 768px) {
+      .container {
+        flex-direction: column;
+      }
+
+      .sidebar {
+        max-height: 300px;
+      }
+
+      .video-area {
+        height: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="video-area">
+      <div class="video-wrapper">
+        <video id="main-video" class="video-js vjs-default-skin" controls preload="auto"></video>
+      </div>
+      <div id="video-title">Loading...</div>
+    </div>
+    <div class="sidebar" id="sidebar">
+      <div class="toolbar">
+        <div>{{ lms_title }}</div>
+        <div><span class="toggle-btn" onclick="toggleDarkMode()">🌓</span></div>
+      </div>
+
+      <ul id="course-list">
+        {% macro render_folder(items) %}
+        <ul>
+          {% for item in items %}
+            {% if item.type == 'folder' %}
+              <li>
+                <div class="folder" onclick="toggle(this)">📁 {{ item.name }}</div>
+                <div class="children">
+                  {{ render_folder(item.children) }}
+                </div>
+              </li>
+            {% elif item.type == 'video' %}
+              <li>
+                <a href="#" class="video-link {% if item.path in progress %}watched{% endif %}"
+                   onclick="loadVideo('{{ url_for('serve_video', filepath=item.path) }}', '{{ item.name }}', this)">
+                   🎬 {{ item.name }}
+                </a>
+              </li>
+            {% endif %}
+          {% endfor %}
+        </ul>
+        {% endmacro %}
+        {{ render_folder(course) }}
+      </ul>
+    </div>
+  </div>
+
+  <script src="https://vjs.zencdn.net/8.3.0/video.min.js"></script>
+  <script>
+    const player = videojs('main-video');
+    const courseName = "{{ course_name }}";
+    let currentSpeed = 1.0;
+
+    let videoList = [];
+    let currentIndex = -1;
+
+    // Load and play a video, with resume support and speed retention
+    function loadVideo(url, title, el) {
+      const links = document.querySelectorAll('.video-link');
+      videoList = Array.from(links);
+      currentIndex = videoList.findIndex(a => a.getAttribute('onclick').includes(url));
+
+      player.pause();
+      player.src({ type: "video/mp4", src: url });
+
+      player.one('loadedmetadata', () => {
+        const resumeTime = localStorage.getItem(`${courseName}:resume:${url}`);
+        if (resumeTime) player.currentTime(parseFloat(resumeTime));
+        player.play();
+        player.playbackRate(currentSpeed);  // 🔁 Keep previous speed
+      });
+
+      document.getElementById('video-title').textContent = title;
+      // Expand parent folders of the selected video
+      if (el) {
+        let parent = el.parentElement;
+        while (parent && !parent.classList.contains('sidebar')) {
+          if (parent.classList.contains('children')) {
+            parent.classList.add('open');
+          }
+          parent = parent.parentElement;
+        }
+      }
+
+      localStorage.setItem(`${courseName}:lastSession`, JSON.stringify({ title, url }));
+
+      if (el) el.classList.add('watched');
+
+      fetch('/mark_watched', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: url, course: courseName })
+      });
+    }
+
+    // Save resume time
+    player.on('timeupdate', () => {
+      const url = player.currentSrc();
+      const time = player.currentTime();
+      localStorage.setItem(`${courseName}:resume:${url}`, time);
+    });
+
+    // ▶️ Play next video automatically when one ends
+    player.on('ended', () => {
+      if (videoList.length && currentIndex >= 0 && currentIndex < videoList.length - 1) {
+        const nextEl = videoList[currentIndex + 1];
+        nextEl.click();  // Trigger loadVideo with correct video
+      }
+    });
+
+    // Speed Control
+    player.ready(() => {
+      const controlBar = player.getChild('controlBar');
+      const fullscreenToggle = controlBar.getChild('fullscreenToggle');
+
+      const speedControl = videojs.dom.createEl('div', {
+        className: 'vjs-speed-wrapper vjs-control',
+        innerHTML: `
+          <div class="vjs-speed-button" id="speed-toggle-btn">⏩</div>
+          <div class="speed-slider" id="speed-slider">
+            <span>Speed: <span id="speed-val">1.00x</span></span>
+            <input type="range" min="0.25" max="3" step="0.05" value="1" id="speed-range" />
+          </div>
+        `
+      });
+
+      controlBar.el().insertBefore(speedControl, fullscreenToggle.el());
+
+      const speedSlider = document.getElementById("speed-slider");
+      const toggleBtn = document.getElementById("speed-toggle-btn");
+      const speedVal = document.getElementById("speed-val");
+      const speedRange = document.getElementById("speed-range");
+
+      toggleBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        speedSlider.style.display = speedSlider.style.display === 'block' ? 'none' : 'block';
+      });
+
+      document.addEventListener('click', (e) => {
+        if (!speedSlider.contains(e.target) && e.target !== toggleBtn) {
+          speedSlider.style.display = 'none';
+        }
+      });
+
+      speedRange.addEventListener('input', () => {
+        currentSpeed = parseFloat(speedRange.value);
+        player.playbackRate(currentSpeed);
+        speedVal.textContent = currentSpeed.toFixed(2) + 'x';
+      });
+    });
+
+    // Dark mode, resume playback, and UI init
+    window.addEventListener('DOMContentLoaded', () => {
+      const theme = localStorage.getItem("theme") || "dark";
+      document.body.classList.add(theme);
+      if (theme === "dark") document.getElementById("sidebar").classList.add("dark");
+
+      const last = localStorage.getItem(`${courseName}:lastSession`);
+
+      if (last) {
+        const { title, url } = JSON.parse(last);
+        loadVideo(url, title);
+      } else {
+        // Ask the server for last watched
+        fetch(`/last_watched/${courseName}`)
+          .then(res => res.json())
+          .then(data => {
+            const url = data.path;
+            if (url) {
+              const el = [...document.querySelectorAll('.video-link')].find(a =>
+                a.getAttribute('onclick')?.includes(url)
+              );
+              if (el) {
+                const title = el.textContent.trim();
+                loadVideo(url, title, el);
+              } else {
+                // fallback to first
+                const firstVideo = document.querySelector('.video-link');
+                if (firstVideo) firstVideo.click();
+              }
+            } else {
+              // fallback to first
+              const firstVideo = document.querySelector('.video-link');
+              if (firstVideo) firstVideo.click();
+            }
+          });
+      }
+
+      restoreFolderState();
+
+      const watchedPaths = {{ progress | tojson }};
+      document.querySelectorAll('.video-link').forEach(link => {
+        const href = link.getAttribute('onclick') || "";
+        for (const path in watchedPaths) {
+          if (href.includes(path)) {
+            link.classList.add('watched');
+            break;
+          }
+        }
+      });
+    });
+
+    function restoreFolderState() {
+      document.querySelectorAll('.folder').forEach(el => {
+        const folderKey = 'collapsed:' + el.textContent.trim();
+        const shouldExpand = localStorage.getItem(folderKey) === 'true';
+        const children = el.nextElementSibling;
+        if (shouldExpand && children) children.classList.add('open');
+      });
+    }
+
+    function toggle(el) {
+      const children = el.nextElementSibling;
+      const folderKey = 'collapsed:' + el.textContent.trim();
+      const isOpen = children.classList.contains('open');
+      children.classList.toggle('open', !isOpen);
+      localStorage.setItem(folderKey, !isOpen);
+    }
+
+    function toggleDarkMode() {
+      const body = document.body;
+      const sidebar = document.getElementById("sidebar");
+      body.classList.toggle("dark");
+      body.classList.toggle("light");
+      sidebar.classList.toggle("dark");
+      localStorage.setItem("theme", body.classList.contains("dark") ? "dark" : "light");
+    }
+
+    // Keyboard Shortcuts
+    document.addEventListener('keydown', function (e) {
+      if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
+      switch (e.key) {
+        case ' ': e.preventDefault(); player.paused() ? player.play() : player.pause(); break;
+        case 'ArrowLeft': player.currentTime(player.currentTime() - 10); break;
+        case 'ArrowRight': player.currentTime(player.currentTime() + 10); break;
+        case 'f': case 'F': player.requestFullscreen(); break;
+        case 'm': case 'M': player.muted(!player.muted()); break;
+      }
+    });
+  </script>
+</body>
+</html>
