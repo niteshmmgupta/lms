@@ -1,6 +1,6 @@
 # Local LMS Platform
 
-This is a lightweight **Learning Management System (LMS)** developed by **Nitesh** for organizing and browsing offline course content stored in a folder structure. It allows you to view and navigate through nested folders containing videos, watch them with progress tracking, and resume from where you left off — all from a beautifully designed interface.
+This is a lightweight **Learning Management System (LMS)** for organizing and browsing offline course content stored in a folder structure. It allows you to view and navigate through nested folders containing videos, watch them with progress tracking, and resume from where you left off — all from a beautifully designed interface.
 
 ## 🌟 Features
 
